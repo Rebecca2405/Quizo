@@ -245,9 +245,7 @@ public class AlexaSkillSpeechlet implements SpeechletV2 {
 		} catch (Exception e) {
 			return tellUserAndFinish(e.getMessage());
 		}
-
 	}
-
 	// Achtung, Reihenfolge ist wichtig!
 	void recognizeUserIntent(String userRequest) {
 		userRequest = userRequest.toLowerCase();

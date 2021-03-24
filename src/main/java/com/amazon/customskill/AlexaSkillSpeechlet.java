@@ -45,11 +45,12 @@ public class AlexaSkillSpeechlet implements SpeechletV2 {
 	static Logger logger = LoggerFactory.getLogger(AlexaSkillSpeechlet.class);
 
 	// Variablen, die wir auch schon in DialogOS hatten
-	static int sum;
-	static String antwort1 = "";
-	static String antwort2 = "";
-	static String antwort3 = "";
-	static String antwort4 = "";
+	static int richtigeAntworten = 0;
+	static int falscheAntworten = 0;
+	static String antwortA = "";
+	static String antwortB = "";
+	static String antwortC = "";
+	static String antwortD = "";
 	static String frage = "";
 	static UserIntent correctAnswer = null;
 
@@ -131,7 +132,7 @@ public class AlexaSkillSpeechlet implements SpeechletV2 {
 //		selectQuestion();
 		recState = RecognitionState.Anfangsfrage;
 		return askUserResponse(
-				"Schön, dass du da bist. Ich bin dein persönlicher Vokabeltrainer. Du kannst zu Beginn zwischen einzelnen Vokabeln und ganzen Sätzen wählen, die ich dich dann abfrage. Zu jeder Frage erhälst du vier Antwortmöglichkeiten. Du kannst mit den Buchstaben A, B,C, D antworten. Wenn du etwas nicht verstanden hast, frage einfach nach ob ich es wiederholen kann. Möchtest du Vokabeln oder Sätze lernen?");
+				"Schön, dass du da bist. Ich bin dein persönlicher Vokabeltrainer. Du kannst zu Beginn zwischen einzelnen Vokabeln und ganzen Sätzen wählen, die ich dich dann abfrage. Zu jeder Frage erhälst du vier Antwortmöglichkeiten. Du kannst mit den Buchstaben A, B, C oder D antworten. Möchtest du Vokabeln oder Sätze lernen?");
 	}
 
 	// Hier gehen wir rein, wenn der User etwas gesagt hat
@@ -147,7 +148,8 @@ public class AlexaSkillSpeechlet implements SpeechletV2 {
 
 		recognizeUserIntent(userRequest);
 		if (ourUserIntent == UserIntent.Abbrechen) {
-			return tellUserAndFinish("Bis zum nächsten Mal.");
+			return tellUserAndFinish("Du hast " + richtigeAntworten + " von " + (richtigeAntworten + falscheAntworten)
+					+ " Fragen richtig beantwortet. Bis zum nächsten Mal.");
 		}
 		if (ourUserIntent == UserIntent.Error) {
 			return tellUserAndFinish(
@@ -167,11 +169,30 @@ public class AlexaSkillSpeechlet implements SpeechletV2 {
 	private SpeechletResponse beantworteQuizfrage(String userRequest) {
 
 		if (ourUserIntent == correctAnswer) {
-
+			richtigeAntworten = richtigeAntworten + 1;
 			return stelleEineFrage("Super. Das war richtig. ");
 
 		} else {
-			return stelleEineFrage("Das war leider falsch. ");
+			String korrekteAntwort = "";
+			switch (correctAnswer) {
+			case A:
+				korrekteAntwort = antwortA;
+				break;
+			case B:
+				korrekteAntwort = antwortB;
+				break;
+			case C:
+				korrekteAntwort = antwortC;
+				break;
+			case D:
+				korrekteAntwort = antwortD;
+				break;
+			default:
+				break;
+			}
+			falscheAntworten = falscheAntworten + 1;
+			return stelleEineFrage("Das war leider falsch. Die richtige Antwort lautet: " + korrekteAntwort
+					+ " . Machen wir mit der nächsten Frage weiter. ");
 		}
 
 	}
@@ -235,30 +256,30 @@ public class AlexaSkillSpeechlet implements SpeechletV2 {
 				correctAnswer = UserIntent.D;
 				break;
 			}
-			antwort1 = selectedQuestion.getAntwort1();
-			antwort2 = selectedQuestion.getAntwort2();
-			antwort3 = selectedQuestion.getAntwort3();
-			antwort4 = selectedQuestion.getAntwort4();
+			antwortA = selectedQuestion.getAntwort1();
+			antwortB = selectedQuestion.getAntwort2();
+			antwortC = selectedQuestion.getAntwort3();
+			antwortD = selectedQuestion.getAntwort4();
 
-			return askUserResponse(prefix + "Was bedeutet " + frage + " auf Englisch? Antwort a: " + antwort1
-					+ ", Antwort b: " + antwort2 + ", Antwort c: " + antwort3 + ", Antwort d: " + antwort4);
+			return askUserResponse(prefix + "Was bedeutet " + frage + " auf Englisch? Antwort a: " + antwortA
+					+ ", Antwort b: " + antwortB + ", Antwort c: " + antwortC + ", Antwort d: " + antwortD);
 		} catch (Exception e) {
 			return tellUserAndFinish(e.getMessage());
 		}
 	}
+
 	// Achtung, Reihenfolge ist wichtig!
 	void recognizeUserIntent(String userRequest) {
-		userRequest = userRequest.toLowerCase();
+		userRequest = userRequest.toLowerCase().trim();
 		userResponse = userRequest;
 		String pattern1 = "(ich nehme )?(antwort )?(\\b[a-d]\\b)( bitte)?";
 		String pattern2 = "(vokabeln){1}";
-		String pattern3 = "(sätze){1}";
+		String pattern3 = "(sätze)|(saetze)|(setze){1}";
 		String pattern4 = "(ich möchte )?(aufhören){1}";
 		String pattern5 = "(ich möchte )?(quizo)(beenden){1}";
 		String pattern6 = "(ich habe )? (keine lust mehr )(quizo zu spielen)?";
 		String pattern7 = "(ich möchte )?(vokabeln )(heute )?(lernen)?";
 		String pattern8 = "(ich möchte )?(heute )?(sätze )(lernen)?";
-		
 
 		Pattern p1 = Pattern.compile(pattern1);
 		Matcher m1 = p1.matcher(userRequest);
@@ -276,7 +297,6 @@ public class AlexaSkillSpeechlet implements SpeechletV2 {
 		Matcher m7 = p7.matcher(userRequest);
 		Pattern p8 = Pattern.compile(pattern8);
 		Matcher m8 = p8.matcher(userRequest);
-		
 
 		if (m1.find()) {
 			String answer = m1.group(3);

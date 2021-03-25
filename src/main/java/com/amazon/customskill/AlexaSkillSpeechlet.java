@@ -9,18 +9,14 @@
  */
 package com.amazon.customskill;
 
-import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
-import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,15 +40,19 @@ public class AlexaSkillSpeechlet implements SpeechletV2 {
 	// hilft hinterher bei der Fehlersuche!
 	static Logger logger = LoggerFactory.getLogger(AlexaSkillSpeechlet.class);
 
-	// Variablen, die wir auch schon in DialogOS hatten
+	// Zähler für richtige und falsche Antworten
 	static int richtigeAntworten = 0;
 	static int falscheAntworten = 0;
+
+	// ausgelesene Frage- und Antwortmöglichkeiten
 	static String antwortA = "";
 	static String antwortB = "";
 	static String antwortC = "";
 	static String antwortD = "";
 	static String frage = "";
-	static UserIntent correctAnswer = null;
+
+	// erwarteter Intent für die korrekte Antwort
+	static UserIntent korrekteAntwortIntent = null;
 
 	// Was der User gesagt hat
 	public static String userRequest;
@@ -66,47 +66,14 @@ public class AlexaSkillSpeechlet implements SpeechletV2 {
 
 	static String userResponse = "";
 
-	// Was hat der User grade gesagt. (Die "Semantic Tags"aus DialogOS)
-	static enum UserIntent {
-		A, B, C, D, Error, Vokabeln, Saetze, Abbrechen
-	};
-
-	static enum VokabelnOderSaetze {
-		Vokabeln, Saetze
-	};
-
+	// Ob der User sich für Vokabeln oder Sätze entscheidet
 	VokabelnOderSaetze status;
 
 	UserIntent ourUserIntent;
 
-	// Was das System sagen kann
-	Map<String, String> utterances;
-
 	// Baut die Systemäußerung zusammen
 	String buildString(String msg, String replacement1, String replacement2) {
 		return msg.replace("{replacement}", replacement1).replace("{replacement2}", replacement2);
-	}
-
-	// Liest am Anfang alle Systemäußerungen aus Datei ein
-	Map<String, String> readSystemUtterances() {
-		Map<String, String> utterances = new HashMap<String, String>();
-		try {
-			for (String line : IOUtils
-					.readLines(this.getClass().getClassLoader().getResourceAsStream("utterances.txt"))) {
-				if (line.startsWith("#")) {
-					continue;
-				}
-				String[] parts = line.split("=");
-				String key = parts[0].trim();
-				String utterance = parts[1].trim();
-				utterances.put(key, utterance);
-			}
-			logger.info("Read " + utterances.keySet().size() + "utterances");
-		} catch (IOException e) {
-			logger.info("Could not read utterances: " + e.getMessage());
-			System.err.println("Could not read utterances: " + e.getMessage());
-		}
-		return utterances;
 	}
 
 	// Datenbank für Quizfragen
@@ -119,7 +86,6 @@ public class AlexaSkillSpeechlet implements SpeechletV2 {
 	@Override
 	public void onSessionStarted(SpeechletRequestEnvelope<SessionStartedRequest> requestEnvelope) {
 		logger.info("Alexa session begins");
-		utterances = readSystemUtterances();
 	}
 
 	// Wir starten den Dialog:
@@ -129,7 +95,6 @@ public class AlexaSkillSpeechlet implements SpeechletV2 {
 	@Override
 	public SpeechletResponse onLaunch(SpeechletRequestEnvelope<LaunchRequest> requestEnvelope) {
 		logger.info("onLaunch");
-//		selectQuestion();
 		recState = RecognitionState.Anfangsfrage;
 		return askUserResponse(
 				"Schön, dass du da bist. Ich bin dein persönlicher Vokabeltrainer. Du kannst zu Beginn zwischen einzelnen Vokabeln und ganzen Sätzen wählen, die ich dich dann abfrage. Zu jeder Frage erhälst du vier Antwortmöglichkeiten. Du kannst mit den Buchstaben A, B, C oder D antworten. Möchtest du Vokabeln oder Sätze lernen?");
@@ -168,13 +133,13 @@ public class AlexaSkillSpeechlet implements SpeechletV2 {
 
 	private SpeechletResponse beantworteQuizfrage(String userRequest) {
 
-		if (ourUserIntent == correctAnswer) {
+		if (ourUserIntent == korrekteAntwortIntent) {
 			richtigeAntworten = richtigeAntworten + 1;
 			return stelleEineFrage("Super. Das war richtig. ");
 
 		} else {
 			String korrekteAntwort = "";
-			switch (correctAnswer) {
+			switch (korrekteAntwortIntent) {
 			case A:
 				korrekteAntwort = antwortA;
 				break;
@@ -210,6 +175,8 @@ public class AlexaSkillSpeechlet implements SpeechletV2 {
 		return tellUserAndFinish("Dein Userintent ist: " + ourUserIntent);
 	}
 
+	// alle Fragen werden aus der Datenbank gelesen und anschließend randomisiert
+	// eine Frage ausgewählt
 	private SpeechletResponse stelleEineFrage(String prefix) {
 		recState = RecognitionState.Quizfrage;
 		String typ = "";
@@ -228,7 +195,6 @@ public class AlexaSkillSpeechlet implements SpeechletV2 {
 			LinkedList<Frage> fragen = new LinkedList<Frage>();
 
 			while (rs.next()) {
-
 				Frage frageObject = new Frage();
 				frageObject.setFrage(rs.getString("Frage"));
 				frageObject.setRichtig(rs.getString("Richtig"));
@@ -241,21 +207,25 @@ public class AlexaSkillSpeechlet implements SpeechletV2 {
 
 			int randomNum = ThreadLocalRandom.current().nextInt(0, fragen.size() - 1);
 			Frage selectedQuestion = fragen.get(randomNum);
+
+			// Fragen und Antworten werden global gespeichert
 			frage = selectedQuestion.getFrage();
+
 			switch (selectedQuestion.getRichtig()) {
 			case "A":
-				correctAnswer = UserIntent.A;
+				korrekteAntwortIntent = UserIntent.A;
 				break;
 			case "B":
-				correctAnswer = UserIntent.B;
+				korrekteAntwortIntent = UserIntent.B;
 				break;
 			case "C":
-				correctAnswer = UserIntent.C;
+				korrekteAntwortIntent = UserIntent.C;
 				break;
 			case "D":
-				correctAnswer = UserIntent.D;
+				korrekteAntwortIntent = UserIntent.D;
 				break;
 			}
+
 			antwortA = selectedQuestion.getAntwort1();
 			antwortB = selectedQuestion.getAntwort2();
 			antwortC = selectedQuestion.getAntwort3();
@@ -268,7 +238,7 @@ public class AlexaSkillSpeechlet implements SpeechletV2 {
 		}
 	}
 
-	// Achtung, Reihenfolge ist wichtig!
+	// Interpretieren der Usereingabe
 	void recognizeUserIntent(String userRequest) {
 		userRequest = userRequest.toLowerCase().trim();
 		userResponse = userRequest;
@@ -314,19 +284,11 @@ public class AlexaSkillSpeechlet implements SpeechletV2 {
 				ourUserIntent = UserIntent.D;
 				break;
 			}
-		} else if (m2.find()) {
+		} else if (m2.find() || m7.find()) {
 			ourUserIntent = UserIntent.Vokabeln;
-		} else if (m7.find()) {
-			ourUserIntent = UserIntent.Vokabeln;
-		} else if (m3.find()) {
+		} else if (m8.find() || m3.find()) {
 			ourUserIntent = UserIntent.Saetze;
-		} else if (m8.find()) {
-			ourUserIntent = UserIntent.Saetze;
-		} else if (m4.find()) {
-			ourUserIntent = UserIntent.Abbrechen;
-		} else if (m5.find()) {
-			ourUserIntent = UserIntent.Abbrechen;
-		} else if (m6.find()) {
+		} else if (m4.find() || m5.find() || m6.find()) {
 			ourUserIntent = UserIntent.Abbrechen;
 		} else {
 			ourUserIntent = UserIntent.Error;

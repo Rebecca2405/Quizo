@@ -1,8 +1,0 @@
-welcomeMsg = Schön, dass du da bist. Ich bin dein persönlicher Vokabeltrainer. Du kannst zu Beginn zwischen einzelnen Vokabeln und ganzen Sätzen wählen, die ich dich dann abfrage. Zu jeder Frage erhälst du vier Antwortmöglichkeiten. Du kannst mit den Buchstaben a,b,c,d antworten. Wenn du etwas nicht verstanden hast frage einfach nach ob ich es wiederholen kann. Sollen wir starten?
-wrongMsg = Das ist leider falsch.
-correctMsg = Das ist richtig.
-continueMsg = Möchtest Du weiterspielen?
-goodbyeMsg = Bis bald!
-errorYesNoMsg = Das habe ich nicht verstanden. Sag bitte ja oder nein.
-errorAnswerMsg = Das habe ich nicht verstanden. Sag bitte a, b, c, d oder die Antwort.
-sentenceorvocabularyMsg = Möchtest du Sätze oder Vokabeln lernen? 
